@@ -26,7 +26,7 @@ const app = express();
 
 // CORS
 const corsOptions = {
-  origin: ['http://127.0.0.1:8000', 'http://localhost:8000'],
+  origin: ['http://127.0.0.1:8000', 'http://localhost:8000', 'https://ramos.d4trpl-itdel.id'],
   credentials: true,
 };
 app.use(cors(corsOptions));
