@@ -274,8 +274,8 @@ export const getUpcomingMabar = asyncHandler(async (req, res) => {
 
 export const HistoryMabar = asyncHandler(async (req, res) => {
   const { user_id } = req.params;
+  const now = new Date();
 
-  // Ambil semua mabar yang dibuat oleh user tersebut atau diikuti olehnya
   const mabars = await Mabar.find({
     $or: [
       { user_pembuat_mabar: user_id },
@@ -289,7 +289,7 @@ export const HistoryMabar = asyncHandler(async (req, res) => {
         model: "Lapangan",
       },
     })
-    .populate("user_pembuat_mabar", "name") // hanya ambil nama user
+    .populate("user_pembuat_mabar", "name")
     .lean();
 
   const hasil = [];
@@ -297,10 +297,23 @@ export const HistoryMabar = asyncHandler(async (req, res) => {
   for (const mabar of mabars) {
     if (!mabar.jadwal || mabar.jadwal.length === 0) continue;
 
-    // Menghitung jumlah peserta yang bergabung (termasuk pembuat mabar)
-    const totalJoined = (mabar.user_yang_join?.length ?? 0) + 1; // +1 untuk pembuat mabar
+    // Ambil jadwal terakhir berdasarkan tanggal dan jam
+    const sortedJadwal = [...mabar.jadwal].sort((a, b) => {
+      const dateA = new Date(`${a.tanggal}T${a.jam.padStart(2, '0')}:00:00`);
+      const dateB = new Date(`${b.tanggal}T${b.jam.padStart(2, '0')}:00:00`);
+      return dateB - dateA; // descending
+    });
 
-    // Ambil array jadwal langsung tanpa perhitungan waktu
+    const jadwalTerakhir = sortedJadwal[0];
+    const jamAkhir = parseInt(jadwalTerakhir.jam, 10) + 1;
+
+    const waktuSelesai = new Date(`${jadwalTerakhir.tanggal}T${String(jamAkhir).padStart(2, '0')}:00:00`);
+
+    // Cek apakah waktu selesai sudah lewat dari sekarang
+    if (now < waktuSelesai) continue; // skip jika belum selesai
+
+    const totalJoined = (mabar.user_yang_join?.length ?? 0) + 1;
+
     const lapanganUnik = [
       ...new Map(
         mabar.jadwal.map((j) => [j.lapangan._id.toString(), { nama: j.lapangan.name }])
@@ -308,15 +321,17 @@ export const HistoryMabar = asyncHandler(async (req, res) => {
     ];
 
     hasil.push({
-      id_mabar: mabar._id,
+      _id: mabar._id,
       user_pembuat_mabar: {
         id_user: mabar.user_pembuat_mabar._id,
         name: mabar.user_pembuat_mabar.name,
       },
-      totalJoined, // Hitung jumlah total peserta yang bergabung
+      totalJoined,
       kategori: mabar.kategori,
       slot_peserta: mabar.slot_peserta,
-      jadwal: mabar.jadwal, 
+      jadwal: mabar.jadwal,
+      range_umur: mabar.range_umur,
+      level: mabar.level,
       biaya: mabar.biaya,
       nama_mabar: mabar.nama_mabar,
       maksimal: mabar.slot_peserta,

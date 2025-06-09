@@ -6,7 +6,9 @@ import {
     updatePemesananStatus, 
     deletePemesanan,
     getPemesananByUserId,
-    pesananBelumLewatDeadline
+    pesananBelumLewatDeadline,
+    riwayatPemesanan,
+    batalkanPemesanan
     
 } from "../controllers/PemesananController.js";
 import { protectedMiddleware, adminMiddleware } from "../middleware/authMiddleware.js";
@@ -22,9 +24,12 @@ router.get("/", getAllPemesanan);
 // Mendapatkan detail pemesanan berdasarkan ID yang belum lewat
 router.get("/user/pesananBelumLewatDeadline", protectedMiddleware, pesananBelumLewatDeadline);
 
+router.patch('/batalkan/:pemesananId', protectedMiddleware,batalkanPemesanan);
+
 // Mendapatkan detail pemesanan berdasarkan ID
 // router.get("/user/:user_id", protectedMiddleware, getPemesananByUserId);
 
+router.get("/user/riwayatPemesanan", protectedMiddleware, riwayatPemesanan);
 
 
 

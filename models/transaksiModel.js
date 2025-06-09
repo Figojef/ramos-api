@@ -29,9 +29,13 @@ const transaksiSchema = new Schema({
   deadline_pembayaran: {
     type: Date,
     required: true
+  },
+  alasan_penolakan : {
+    type : String,
+    default : null
   }
 });
 
 const Transaksi = mongoose.model("Transaksi", transaksiSchema);
 
-export default Transaksi;
+export default Transaksi;

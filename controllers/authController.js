@@ -2,6 +2,7 @@ import User from "../models/userModel.js";
 import jwt from "jsonwebtoken"
 import asyncHandler from "../middleware/asyncHandler.js";
 import validator from "validator";
+import mongoose from 'mongoose';
 import { v2 as cloudinary } from "cloudinary";
 import streamifier from 'streamifier';
 
@@ -161,8 +162,8 @@ export const updateProfile = asyncHandler(async (req, res) => {
             email: updatedUser.email,
             nomor_telepon: updatedUser.nomor_telepon,
             foto: updatedUser.foto || null,
-        },
-    });
+        },
+    });
 });
 
 export const loginUser = asyncHandler(async(req, res) => {
