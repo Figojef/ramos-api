@@ -16,6 +16,10 @@ async function connectToDatabase() {
 }
 
 export default async function handler(req, res) {
+  if (req.url === '/' && req.method === 'GET') {
+    return res.status(200).json({ message: 'Welcome to the API Root' });
+  }
+
   await connectToDatabase();
-  return app(req, res); // Jalankan Express
+  return app(req, res); // Delegate ke Express
 }

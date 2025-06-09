@@ -9,16 +9,16 @@ import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 import { v2 as cloudinary } from "cloudinary";
 
 // Routes
-import authRouter from './routes/authRouter.js'
-import productRouter from './routes/productRouter.js'
-import lapanganRouter from './routes/lapanganRouter.js'
-import orderRouter from './routes/orderRouter.js'
-import jadwalRouter from './routes/jadwalRouter.js'
-import pemesananRouter from './routes/pemesananRouter.js'
-import transaksiRouter from './routes/transaksiRouter.js'
-import mabarRouter from './routes/mabarRouter.js'
-import eventRouter from './routes/eventRouter.js'
-import ratingRouter from './routes/ratingRouter.js'
+import authRouter from './routes/authRouter.js';
+import productRouter from './routes/productRouter.js';
+import lapanganRouter from './routes/lapanganRouter.js';
+import orderRouter from './routes/orderRouter.js';
+import jadwalRouter from './routes/jadwalRouter.js';
+import pemesananRouter from './routes/pemesananRouter.js';
+import transaksiRouter from './routes/transaksiRouter.js';
+import mabarRouter from './routes/mabarRouter.js';
+import eventRouter from './routes/eventRouter.js';
+import ratingRouter from './routes/ratingRouter.js';
 
 dotenv.config();
 
@@ -39,7 +39,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static('./public'));
 
-// Cloudinary
+// Cloudinary config
 cloudinary.config({ 
   cloud_name: "de9cyaoqo", 
   api_key: 193388313656343, 
@@ -58,12 +58,7 @@ app.use('/api/v1/event', eventRouter);
 app.use('/api/v1/mabar', mabarRouter);
 app.use('/api/v1/rating', ratingRouter);
 
-
-app.get('/', (req, res) => {
-  res.status(200).send('API is running...');
-});
-
-// Error Handling
+// Error handling
 app.use(notFound);
 app.use(errorHandler);
 
