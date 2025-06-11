@@ -514,7 +514,141 @@ export const getJadwalBerhasil = async (req, res) => {
   }
 };
 
+export const AdminCariJadwalByLapanganDanTanggal = asyncHandler(async (req, res) => {
+  const { tanggal, lapangan } = req.body;
 
+  if (!tanggal || !lapangan) {
+    return res.status(400).json({ message: "Tanggal dan Lapangan harus diisi" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(lapangan)) {
+    return res.status(400).json({ message: "Lapangan ID tidak valid" });
+  }
+
+  try {
+    const jadwalList = await Jadwal.find({ tanggal, lapangan }).populate('lapangan');
+
+    if (!jadwalList.length) {
+      return res.status(404).json({ message: "Jadwal tidak ditemukan" });
+    }
+
+    const now = new Date();
+
+    const result = await Promise.all(jadwalList.map(async (jadwal) => {
+      let status = "Tersedia";
+      let user = null;
+
+      // Cek pemesanan terkait jadwal ini
+      const pemesanan = await Pemesanan.findOne({ jadwal_dipesan: jadwal._id }).sort({ _id: -1 }).populate("user_id");
+
+      if (pemesanan) {
+        const transaksi = await Transaksi.findOne({ pemesanan_id: pemesanan._id });
+
+        const statusPemesanan = pemesanan.status_pemesanan;
+        const statusPembayaran = transaksi?.status_pembayaran || "menunggu";
+        const deadline = transaksi ? new Date(transaksi.deadline_pembayaran) : now;
+
+        const belumExpired = deadline > now;
+
+        // Kasus: masih dipesan dan belum expired atau berhasil
+        const sedangDipesanAktif = statusPemesanan === "Sedang Dipesan" && statusPembayaran === "menunggu" && belumExpired;
+        const berhasil = statusPemesanan === "Berhasil";
+
+        if (sedangDipesanAktif || berhasil) {
+          status = "Tidak Tersedia";
+          user = {
+            _id: pemesanan.user_id._id,
+            name: pemesanan.user_id.name,
+            email: pemesanan.user_id.email,
+            nomor_telepon: pemesanan.user_id.nomor_telepon,
+            foto: pemesanan.user_id.foto
+          };
+        }
+      }
+
+      return {
+        _id: jadwal._id,
+        jam: jadwal.jam,
+        harga: jadwal.harga,
+        tanggal: jadwal.tanggal,
+        lapangan: jadwal.lapangan.name,
+        status,
+        user, // null jika tidak ada user aktif
+      };
+    }));
+
+    // Urutkan berdasarkan jam integer
+    const sortedResult = result
+      .map(item => ({
+        ...item,
+        jamAsInt: parseInt(item.jam.replace(':', '')),
+      }))
+      .sort((a, b) => a.jamAsInt - b.jamAsInt)
+      .map(({ jamAsInt, ...rest }) => rest);
+
+    res.status(200).json(sortedResult);
+
+  } catch (error) {
+    res.status(500).json({ message: "Terjadi kesalahan server", error: error.message });
+  }
+});
+
+
+export const AdminEditHargaJadwal = asyncHandler(async (req, res) => {
+  const { jadwal_id, harga } = req.body;
+
+  // Validasi input
+  if (!jadwal_id || harga === undefined) {
+    return res.status(400).json({ message: "jadwal_id dan harga harus diisi." });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(jadwal_id)) {
+    return res.status(400).json({ message: "jadwal_id tidak valid." });
+  }
+
+  const jadwal = await Jadwal.findById(jadwal_id);
+  if (!jadwal) {
+    return res.status(404).json({ message: "Jadwal tidak ditemukan." });
+  }
+
+  // Cek apakah jadwal Tersedia (mengikuti logika sebelumnya)
+  const now = new Date();
+  let isAvailable = true;
+
+  const pemesanan = await Pemesanan.findOne({ jadwal_dipesan: jadwal._id }).sort({ _id: -1 });
+
+  if (pemesanan) {
+    const transaksi = await Transaksi.findOne({ pemesanan_id: pemesanan._id });
+
+    const statusPemesanan = pemesanan.status_pemesanan;
+    const statusPembayaran = transaksi?.status_pembayaran || "menunggu";
+    const deadline = transaksi ? new Date(transaksi.deadline_pembayaran) : now;
+
+    const belumExpired = deadline > now;
+    const sedangDipesanAktif = statusPemesanan === "Sedang Dipesan" && statusPembayaran === "menunggu" && belumExpired;
+    const berhasil = statusPemesanan === "Berhasil";
+
+    if (sedangDipesanAktif || berhasil) {
+      isAvailable = false;
+    }
+  }
+
+  if (!isAvailable) {
+    return res.status(403).json({
+      message: "Jadwal tidak dapat diedit karena sedang dipesan atau sudah berhasil dipesan.",
+    });
+  }
+
+  // Update harga
+  jadwal.harga = harga;
+  await jadwal.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Harga jadwal berhasil diperbarui.",
+    data: jadwal,
+  });
+});
 
 export const DetailJadwal = asyncHandler(async(req,res) => {
   res.send("Detail Jadwal")

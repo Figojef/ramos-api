@@ -10,11 +10,17 @@ import {
   JadwalByLapangan,
   JadwalRutinHarian,
   JadwalByTanggal,
-  getJadwalBerhasil
+  getJadwalBerhasil,
+  AdminCariJadwalByLapanganDanTanggal,
+  AdminEditHargaJadwal
 
 } from "../controllers/JadwalController.js";
 
 const router = express.Router();
+
+router.post('/admin/jadwal-by-lapangan-dan-tanggal', protectedMiddleware, adminMiddleware, AdminCariJadwalByLapanganDanTanggal)
+
+router.patch('/admin/edit-harga-jadwal', protectedMiddleware, adminMiddleware, AdminEditHargaJadwal)
 
 // Route for getting all jadwal
 router.get('/', AllJadwal);
