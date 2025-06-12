@@ -20,7 +20,7 @@ const router = express.Router()
 
 router.post('/', CreateMabar)
 
-router.post('/join', JoinMabar)
+router.post('/join', protectedMiddleware,JoinMabar)
 
 router.post('/keluar', KeluarMabar)
 

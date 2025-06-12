@@ -8,7 +8,10 @@ import {
     getPemesananByUserId,
     pesananBelumLewatDeadline,
     riwayatPemesanan,
-    batalkanPemesanan
+    batalkanPemesanan,
+    getPemesananUntukKonfirmasi,
+    konfirmasiPemesanan,
+    tolakPemesanan
     
 } from "../controllers/PemesananController.js";
 import { protectedMiddleware, adminMiddleware } from "../middleware/authMiddleware.js";
@@ -41,5 +44,11 @@ router.put("/:id", protectedMiddleware, updatePemesananStatus);
 
 // Menghapus pemesanan
 router.delete("/:id", protectedMiddleware, adminMiddleware, deletePemesanan);
+
+router.get("/admin/kelola/pemesanan/index", protectedMiddleware, adminMiddleware, getPemesananUntukKonfirmasi)
+
+router.patch("/admin/kelola/pemesanan/konfirmasi-pemesanan/:id", protectedMiddleware, adminMiddleware, konfirmasiPemesanan)
+
+router.patch('/admin/kelola/pemesanan/tolak-pemesanan/:id', protectedMiddleware, adminMiddleware, tolakPemesanan)
 
 export default router;

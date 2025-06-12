@@ -3,6 +3,7 @@ import Pemesanan from "../models/pemesananModel.js";
 import Jadwal from "../models/jadwalModel.js";
 import User from "../models/userModel.js";
 import Transaksi from "../models/transaksiModel.js";
+import mongoose from "mongoose";
 
 
 // 1. Membuat Pemesanan Baru
@@ -426,4 +427,166 @@ export const batalkanPemesanan = asyncHandler(async (req, res) => {
 
 
 
+export const getPemesananUntukKonfirmasi = asyncHandler(async (req, res) => {
+    try {
+        const now = new Date();
 
+        // Ambil semua pemesanan yang masih valid untuk dikonfirmasi
+        const pemesananList = await Pemesanan.find({
+            status_pemesanan: "Sedang Dipesan", // Masih dalam proses
+            is_expired: false
+        })
+        .populate("user_id", "name email") // Hanya ambil nama & email user
+        .populate({
+            path: "jadwal_dipesan",
+            populate: { path: "lapangan", select: "name" } // Include nama lapangan
+        })
+        .lean();
+
+        const result = [];
+
+        for (const pemesanan of pemesananList) {
+            const transaksi = await Transaksi.findOne({
+                pemesanan_id: pemesanan._id,
+                status_pembayaran: "menunggu", // Belum dibayar
+                deadline_pembayaran: { $gt: now } // Masih dalam batas waktu
+            }).lean();
+
+            // Jika tidak ada transaksi yang valid, skip
+            if (!transaksi) continue;
+
+            result.push({
+                _id: pemesanan._id,
+                user: {
+                    name: pemesanan.user_id.name,
+                    email: pemesanan.user_id.email,
+                },
+                total_harga: pemesanan.total_harga,
+                status_pemesanan: pemesanan.status_pemesanan,
+                status_pembayaran: transaksi.status_pembayaran,
+                metode_pembayaran: transaksi.metode_pembayaran,
+                deadline_pembayaran: transaksi.deadline_pembayaran,
+                bukti_pembayaran : transaksi.bukti_pembayaran,
+                jadwal: pemesanan.jadwal_dipesan.map(j => ({
+                    jam: j.jam,
+                    tanggal: j.tanggal,
+                    lapangan: j.lapangan.name,
+                    harga: j.harga
+                }))
+            });
+        }
+
+        res.status(200).json({ data: result });
+
+    } catch (error) {
+        res.status(500).json({
+            message: "Terjadi kesalahan saat mengambil data pemesanan",
+            error: error.message
+        });
+    }
+});
+
+
+
+export const konfirmasiPemesanan = asyncHandler(async (req, res) => {
+    const { id } = req.params; // Ambil ID pemesanan dari URL
+  
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "ID pemesanan tidak valid" });
+    }
+  
+    // Cari pemesanan dan transaksi terkait
+    const pemesanan = await Pemesanan.findById(id).populate("jadwal_dipesan");
+    if (!pemesanan) {
+      return res.status(404).json({ message: "Pemesanan tidak ditemukan" });
+    }
+  
+    const transaksi = await Transaksi.findOne({ pemesanan_id: id });
+    if (!transaksi) {
+      return res.status(404).json({ message: "Transaksi tidak ditemukan" });
+    }
+  
+    // Validasi kondisi
+    const now = new Date();
+    if (
+      pemesanan.status_pemesanan !== "Sedang Dipesan" ||
+      transaksi.status_pembayaran !== "menunggu" ||
+      new Date(transaksi.deadline_pembayaran) < now
+    ) {
+      return res.status(400).json({
+        message:
+          "Pemesanan tidak dapat dikonfirmasi. Pastikan status pesanan dan pembayaran benar, serta deadline belum lewat.",
+      });
+    }
+  
+    // Update status pemesanan dan pembayaran
+    pemesanan.status_pemesanan = "Berhasil";
+    transaksi.status_pembayaran = "berhasil";
+  
+    await pemesanan.save();
+    await transaksi.save();
+  
+    // Update setiap jadwal menjadi Booked
+    await Jadwal.updateMany(
+      { _id: { $in: pemesanan.jadwal_dipesan } },
+      { $set: { status_booking: "Booked" } }
+    );
+  
+    return res.status(200).json({
+      message: "Pemesanan berhasil dikonfirmasi.",
+      data: {
+        pemesanan_id: pemesanan._id,
+        status_pemesanan: pemesanan.status_pemesanan,
+        status_pembayaran: transaksi.status_pembayaran,
+      },
+    });
+  });
+
+
+export const tolakPemesanan = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { alasan_penolakan } = req.body; // Ambil alasan dari body
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "ID pemesanan tidak valid" });
+    }
+
+    const pemesanan = await Pemesanan.findById(id).populate("jadwal_dipesan");
+    if (!pemesanan) return res.status(404).json({ message: "Pemesanan tidak ditemukan" });
+
+    const transaksi = await Transaksi.findOne({ pemesanan_id: id });
+    if (!transaksi) return res.status(404).json({ message: "Transaksi tidak ditemukan" });
+
+    const now = new Date();
+    if (
+        pemesanan.status_pemesanan !== "Sedang Dipesan" ||
+        transaksi.status_pembayaran !== "menunggu" ||
+        new Date(transaksi.deadline_pembayaran) < now
+    ) {
+        return res.status(400).json({
+            message: "Pemesanan tidak dapat ditolak, karena pemesanan sudah kadaluarsa atau lewat deadline.",
+        });
+    }
+
+    pemesanan.status_pemesanan = "Ditolak";
+    pemesanan.alasan_penolakan = alasan_penolakan; // simpan alasan
+
+    transaksi.status_pembayaran = "gagal";
+    transaksi.alasan_penolakan = alasan_penolakan; // simpan juga di transaksi
+
+    await pemesanan.save();
+    await transaksi.save();
+
+    await Jadwal.updateMany(
+        { _id: { $in: pemesanan.jadwal_dipesan } },
+        { $set: { status_booking: "Tersedia" } }
+    );
+
+    return res.status(200).json({
+        message: "Pemesanan berhasil ditolak.",
+        data: {
+            pemesanan_id: pemesanan._id,
+            alasan_penolakan: alasan_penolakan
+        },
+    });
+});
